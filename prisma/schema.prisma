@@ -2,152 +2,263 @@ generator client {
   provider = "prisma-client-js"
 }
 
-_datasource db {
+datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-enum PipelineStatus {
-  ILK_TEMAS
-  FOTO_BEKLENIYOR
-  FIYAT_VERILDI
-  POZITIF
-  DEAL_CONFIRMED
-  KAYBEDILDI
+enum Role {
+  ADMIN
+  COORDINATOR
+  DOCTOR
+  VIEWER
 }
 
-enum TaskStatus {
-  PENDING
-  TAMAMLANDI
+enum LeadStage {
+  INITIAL_CONTACT
+  WAITING_PHOTOS
+  QUOTE_SENT
+  POSITIVE
+  DEAL_CONFIRMED
+  LOST
 }
 
 enum ActivityType {
-  CALL
-  EMAIL
+  PHONE_CALL
   WHATSAPP
-  NOTE
+  EMAIL
+  IN_PERSON
+  VIDEO_CALL
+  SYSTEM
 }
 
-enum TemplateType {
-  GENERIC
-  HOTEL
-  TRANSFER
-  DEAL
+enum ActivityOutcome {
+  REACHED
+  NOT_REACHED
+  QUOTE_SENT
+  INFO_PROVIDED
+  CALLBACK_REQUESTED
+}
+
+enum TreatmentPlanStatus {
+  DRAFT
+  SENT_TO_PATIENT
+  ACCEPTED
+  REJECTED
+}
+
+enum Currency {
+  GBP
+  EUR
+  USD
+  TRY
+}
+
+enum LostReasonCategory {
+  PRICE_FINANCIAL
+  PATIENT_INTEREST
+  COMPETITOR
+  COMMUNICATION
+  MEDICAL
+  LOGISTICS
+  OTHER
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(COORDINATOR)
+  leadsOwned    Lead[]   @relation("LeadOwner")
+  tasks         Task[]
+  activities    Activity[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Lead {
-  id            String          @id @default(cuid())
-  adSoyad       String
-  email         String?
-  telefon       String?
-  ulke          String?
-  kaynak        String?
-  status        PipelineStatus  @default(ILK_TEMAS)
-  notlar        String?         @db.Text
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  tasks         Task[]
-  activities    Activity[]
+  id                String       @id @default(cuid())
+  firstName         String
+  lastName          String
+  gender            String?
+  birthDate         DateTime?
+  country           String
+  phone             String
+  email             String?
+  whatsappEnabled   Boolean      @default(false)
+  communicationPref String?
+  source            String
+  referenceName     String?
+  referenceNote     String?
+  leadDate          DateTime     @default(now())
+  stage             LeadStage    @default(INITIAL_CONTACT)
+  owner             User?        @relation("LeadOwner", fields: [ownerId], references: [id])
+  ownerId           String?
+  nextFollowUpDate  DateTime?
+  status            String       @default("ACTIVE")
+  lastActivityAt    DateTime?
+  totalPlanPrice    Float?
+  consentGiven      Boolean      @default(false)
+  consentDate       DateTime?
+  consentFileUrl    String?
+  marketingOptIn    Boolean      @default(false)
+
+  tasks          Task[]
+  activities     Activity[]
   treatmentPlans TreatmentPlan[]
-  files         LeadFile[]
-  deal          Deal?
-}
+  lostReason     LostReason?
+  files          LeadFile[]
+  deal           Deal?
 
-model Task {
-  id        String     @id @default(cuid())
-  title     String
-  dueDate   DateTime?
-  status    TaskStatus @default(PENDING)
-  leadId    String
-  lead      Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  createdAt DateTime   @default(now())
-}
-
-model Activity {
-  id        String       @id @default(cuid())
-  type      ActivityType @default(NOTE)
-  content   String       @db.Text
-  userName  String?
-  leadId    String
-  lead      Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  createdAt DateTime     @default(now())
-}
-
-model TreatmentPlan {
-  id        String          @id @default(cuid())
-  label     String
-  currency  String          @default("EUR")
-  leadId    String
-  lead      Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  items     TreatmentItem[]
-  createdAt DateTime        @default(now())
-}
-
-model TreatmentItem {
-  id              String        @id @default(cuid())
-  name            String
-  price           Decimal       @db.Decimal(10, 2)
-  quantity        Int           @default(1)
-  treatmentPlanId String
-  treatmentPlan   TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
-}
-
-model PriceItem {
-  id        String   @id @default(cuid())
-  name      String
-  category  String?
-  price     Decimal  @db.Decimal(10, 2)
-  currency  String   @default("EUR")
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LostReason {
+  id          String             @id @default(cuid())
+  lead        Lead               @relation(fields: [leadId], references: [id])
+  leadId      String             @unique
+  category    LostReasonCategory
+  reasonKey   String
+  description String?
+  createdAt   DateTime           @default(now())
 }
 
 model LeadFile {
   id        String   @id @default(cuid())
-  fileName  String
-  filePath  String
-  fileSize  Int
-  mimeType  String?
+  lead      Lead     @relation(fields: [leadId], references: [id])
   leadId    String
-  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  uploadedAt DateTime @default(now())
+  type      String
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model TreatmentPlan {
+  id                  String               @id @default(cuid())
+  lead                Lead                 @relation(fields: [leadId], references: [id])
+  leadId              String
+  name                String
+  status              TreatmentPlanStatus  @default(DRAFT)
+  currency            Currency             @default(GBP)
+  subtotal            Float?
+  discount            Float?
+  total               Float?
+  includesHotel       Boolean              @default(false)
+  includesTransfer    Boolean              @default(false)
+  includesMedications Boolean              @default(false)
+  note                String?
+  items               TreatmentPlanItem[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model TreatmentPlanItem {
+  id              String        @id @default(cuid())
+  treatmentPlan   TreatmentPlan @relation(fields: [treatmentPlanId], references: [id])
+  treatmentPlanId String
+  priceItem       PriceItem?    @relation(fields: [priceItemId], references: [id])
+  priceItemId     String?
+  title           String
+  description     String?
+  quantity        Int           @default(1)
+  unitPrice       Float
+  lineTotal       Float
+}
+
+model PriceItem {
+  id        String   @id @default(cuid())
+  category  String
+  name      String
+  code      String?
+  currency  Currency @default(GBP)
+  unitPrice Float
+  note      String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items     TreatmentPlanItem[]
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  lead        Lead     @relation(fields: [leadId], references: [id])
+  leadId      String
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      String   @default("OPEN")
+  assignee    User?    @relation(fields: [assigneeId], references: [id])
+  assigneeId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Activity {
+  id            String          @id @default(cuid())
+  lead          Lead            @relation(fields: [leadId], references: [id])
+  leadId        String
+  type          ActivityType
+  outcome       ActivityOutcome?
+  note          String?
+  performedBy   User?           @relation(fields: [performedById], references: [id])
+  performedById String?
+  createdAt     DateTime        @default(now())
 }
 
 model Hotel {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
-  city      String?
+  email     String
+  address   String?
   note      String?
-  isActive  Boolean @default(true)
+  active    Boolean  @default(true)
   deals     Deal[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-model TransferOption {
-  id        String  @id @default(cuid())
+model TransferCompany {
+  id        String   @id @default(cuid())
   name      String
-  provider  String?
+  email     String
+  phone     String?
   note      String?
-  isActive  Boolean @default(true)
+  active    Boolean  @default(true)
   deals     Deal[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model EmailTemplate {
-  id       String       @id @default(cuid())
-  title    String
-  subject  String
-  body     String       @db.Text
-  type     TemplateType @default(GENERIC)
+  id        String   @id @default(cuid())
+  key       String   @unique
+  subject   String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Deal {
-  id               String          @id @default(cuid())
-  leadId           String          @unique
-  lead             Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  hotelId          String?
-  hotel            Hotel?          @relation(fields: [hotelId], references: [id])
-  transferId       String?
-  transfer         TransferOption? @relation(fields: [transferId], references: [id])
-  hotelEmailSent   Boolean         @default(false)
-  transferEmailSent Boolean        @default(false)
-  notes            String?         @db.Text
-  confirmedAt      DateTime?
+  id                 String           @id @default(cuid())
+  lead               Lead             @relation(fields: [leadId], references: [id])
+  leadId             String           @unique
+  treatmentPlan      TreatmentPlan?   @relation(fields: [treatmentPlanId], references: [id])
+  treatmentPlanId    String?
+  totalPrice         Float?
+  currency           Currency         @default(GBP)
+  arrivalDate        DateTime?
+  departureDate      DateTime?
+  flightIn           String?
+  flightOut          String?
+  hotel              Hotel?           @relation(fields: [hotelId], references: [id])
+  hotelId            String?
+  hotelRoomType      String?
+  nights             Int?
+  extraGuestName     String?
+  transferCompany    TransferCompany? @relation(fields: [transferCompanyId], references: [id])
+  transferCompanyId  String?
+  meetAndGreetNote   String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 }

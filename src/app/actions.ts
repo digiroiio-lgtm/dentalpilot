@@ -153,30 +153,49 @@ export async function addTreatmentItem(formData: FormData) {
   revalidatePath(`/leads/${parsed.leadId}`);
 }
 
-export async function updateDealSelection(leadId: string, data: { hotelId?: string | null; transferId?: string | null }) {
+export async function updateDealSelection(formData: FormData) {
+  const leadId = formData.get("leadId")?.toString() ?? "";
+  const hotelId = formData.get("hotelId")?.toString();
+  const transferId = formData.get("transferId")?.toString();
+
   await prisma.deal.upsert({
     where: { leadId },
-    update: { ...data },
+    update: {
+      hotelId: hotelId || null,
+      transferId: transferId || null
+    },
     create: {
       leadId,
-      ...data
+      hotelId: hotelId || null,
+      transferId: transferId || null
     }
   });
   revalidatePath(`/leads/${leadId}`);
 }
 
-export async function markDealEmail(leadId: string, payload: { hotelEmailSent?: boolean; transferEmailSent?: boolean }) {
-  await prisma.deal.update({
+export async function markDealEmail(formData: FormData) {
+  const leadId = formData.get("leadId")?.toString() ?? "";
+  const type = formData.get("type")?.toString();
+  const value = formData.get("value")?.toString() === "true";
+
+  await prisma.deal.upsert({
     where: { leadId },
-    data: {
-      hotelEmailSent: payload.hotelEmailSent,
-      transferEmailSent: payload.transferEmailSent
+    update: {
+      hotelEmailSent: type === "hotel" ? value : undefined,
+      transferEmailSent: type === "transfer" ? value : undefined
+    },
+    create: {
+      leadId,
+      hotelEmailSent: type === "hotel" ? value : false,
+      transferEmailSent: type === "transfer" ? value : false
     }
   });
   revalidatePath(`/leads/${leadId}`);
 }
 
-export async function confirmDeal(leadId: string) {
+export async function confirmDeal(formData: FormData) {
+  const leadId = formData.get("leadId")?.toString() ?? "";
+
   await prisma.deal.upsert({
     where: { leadId },
     update: { confirmedAt: new Date() },
