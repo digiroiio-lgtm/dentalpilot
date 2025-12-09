@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+_datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PipelineStatus {
+  ILK_TEMAS
+  FOTO_BEKLENIYOR
+  FIYAT_VERILDI
+  POZITIF
+  DEAL_CONFIRMED
+  KAYBEDILDI
+}
+
+enum TaskStatus {
+  PENDING
+  TAMAMLANDI
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  WHATSAPP
+  NOTE
+}
+
+enum TemplateType {
+  GENERIC
+  HOTEL
+  TRANSFER
+  DEAL
+}
+
+model Lead {
+  id            String          @id @default(cuid())
+  adSoyad       String
+  email         String?
+  telefon       String?
+  ulke          String?
+  kaynak        String?
+  status        PipelineStatus  @default(ILK_TEMAS)
+  notlar        String?         @db.Text
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  tasks         Task[]
+  activities    Activity[]
+  treatmentPlans TreatmentPlan[]
+  files         LeadFile[]
+  deal          Deal?
+}
+
+model Task {
+  id        String     @id @default(cuid())
+  title     String
+  dueDate   DateTime?
+  status    TaskStatus @default(PENDING)
+  leadId    String
+  lead      Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  type      ActivityType @default(NOTE)
+  content   String       @db.Text
+  userName  String?
+  leadId    String
+  lead      Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+}
+
+model TreatmentPlan {
+  id        String          @id @default(cuid())
+  label     String
+  currency  String          @default("EUR")
+  leadId    String
+  lead      Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  items     TreatmentItem[]
+  createdAt DateTime        @default(now())
+}
+
+model TreatmentItem {
+  id              String        @id @default(cuid())
+  name            String
+  price           Decimal       @db.Decimal(10, 2)
+  quantity        Int           @default(1)
+  treatmentPlanId String
+  treatmentPlan   TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+}
+
+model PriceItem {
+  id        String   @id @default(cuid())
+  name      String
+  category  String?
+  price     Decimal  @db.Decimal(10, 2)
+  currency  String   @default("EUR")
+  createdAt DateTime @default(now())
+}
+
+model LeadFile {
+  id        String   @id @default(cuid())
+  fileName  String
+  filePath  String
+  fileSize  Int
+  mimeType  String?
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  uploadedAt DateTime @default(now())
+}
+
+model Hotel {
+  id        String  @id @default(cuid())
+  name      String
+  city      String?
+  note      String?
+  isActive  Boolean @default(true)
+  deals     Deal[]
+}
+
+model TransferOption {
+  id        String  @id @default(cuid())
+  name      String
+  provider  String?
+  note      String?
+  isActive  Boolean @default(true)
+  deals     Deal[]
+}
+
+model EmailTemplate {
+  id       String       @id @default(cuid())
+  title    String
+  subject  String
+  body     String       @db.Text
+  type     TemplateType @default(GENERIC)
+}
+
+model Deal {
+  id               String          @id @default(cuid())
+  leadId           String          @unique
+  lead             Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  hotelId          String?
+  hotel            Hotel?          @relation(fields: [hotelId], references: [id])
+  transferId       String?
+  transfer         TransferOption? @relation(fields: [transferId], references: [id])
+  hotelEmailSent   Boolean         @default(false)
+  transferEmailSent Boolean        @default(false)
+  notes            String?         @db.Text
+  confirmedAt      DateTime?
+}
