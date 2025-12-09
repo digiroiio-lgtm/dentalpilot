@@ -239,6 +239,17 @@ model EmailTemplate {
   updatedAt DateTime @updatedAt
 }
 
+model ClinicSetting {
+  id              String   @id @default(cuid())
+  clinicName      String
+  address         String?
+  primaryEmail    String
+  defaultCurrency Currency @default(GBP)
+  logoUrl         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 model Deal {
   id                 String           @id @default(cuid())
   lead               Lead             @relation(fields: [leadId], references: [id])

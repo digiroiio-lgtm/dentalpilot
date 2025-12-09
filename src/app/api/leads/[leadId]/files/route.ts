@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: Request, { params }: { params: { leadId: string } }) {
   const formData = await request.formData();
   const file = formData.get("file");
+  const type = formData.get("type")?.toString() ?? "DOCUMENT";
 
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: "Dosya zorunlu" }, { status: 400 });
@@ -25,10 +26,8 @@ export async function POST(request: Request, { params }: { params: { leadId: str
   await prisma.leadFile.create({
     data: {
       leadId: params.leadId,
-      fileName: file.name,
-      filePath: publicPath,
-      fileSize: buffer.byteLength,
-      mimeType: file.type
+      type,
+      url: publicPath
     }
   });
 
